@@ -68,6 +68,7 @@ INJECTED OUTAGE         one region, one window, degrade odds cranked up
 
 -> To dsetect the outage across a region we have to tally up 
 the buffering-rate per region per time window, e.g 
+`rebuffer_ratio` = buffering_events/ total_events
 ```
 window     region-A   region-B   region-C(doomed)
 0–60         0.11       0.13        0.12
