@@ -1,4 +1,3 @@
-from pprint import pprint
 import time 
 import random
 from enum import Enum
@@ -12,15 +11,16 @@ REGIONS = [ "iad-01",   # US East
     "sin-01",   # Asia Pacific
     "bom-01",   # India
 ] 
-# baseline buffer probability 
-# its not 0 as it would mean no session ever buffers no noise
-# 0.12 = 12% of time any given session is briefly buffering, which is normal
-BASE_P_BUFFER = 0.12
+P_TO_B_BUFFER = 0.12 # PLAYING->BUFFERING chance (outage probability) base outage buffer,#entry rate
+B_TO_P_BUFFER = 0.30 # BUFFERING->PLAYING chance #drain rate
+B_TO_S_BUFFER = 0.05 # BUFFERING -> STALL chance
+S_TO_B_BUFFER = 0.20 # STALL -> BUFFERING chance
+
 
 OUTAGE = {
     "region": REGIONS[0],
-    "start": 100,  #tick in which outage starts 
-    "ends": 120,   #tick at which outage ends
+    "start": 0,  #tick in which outage starts 
+    "ends": 200,   #tick at which outage ends
     "severity": 5 #multiplier on the baseline buffer
 }
 N_SESSIONS = 20 # no of concurrent viewers 
@@ -41,26 +41,54 @@ class Session:
         self.region:str = region
         self.state:PlaybackState = PlaybackState.PLAYING
 
+    def state_transition(self,buffering:float):
+        """
+        transition rules based on probability defined 
+        P_TO_B = chances of buffering 
+        B_TO_S = chance of stalling 
+        S_TO_B = chance of un-stalling
+        B_TO_P = chance of recovery
+        """
+        roll = random.random() 
+        p_to_b_buffer = buffering
+        if self.state == PlaybackState.PLAYING:
+            # 2 states possible form playing
+            if roll < p_to_b_buffer:
+                self.state = PlaybackState.BUFFERING 
+            else:
+                self.state = PlaybackState.PLAYING 
+
+        elif self.state == PlaybackState.BUFFERING:
+            #all 3 states possible 
+            if roll < B_TO_S_BUFFER:
+                self.state = PlaybackState.STALL 
+            elif roll < B_TO_S_BUFFER + B_TO_P_BUFFER:
+                self.state = PlaybackState.PLAYING 
+            else:
+                self.state = PlaybackState.BUFFERING 
+
+        elif self.state == PlaybackState.STALL:
+            # can only go to buffering 
+            if roll < S_TO_B_BUFFER:
+                self.state = PlaybackState.BUFFERING 
+            else:
+                self.state = PlaybackState.STALL
+
     def advance(self,tick):
         """
         Decides the session NEXT state for this tick 
         read self.state -> roll probability _> write self.state
         """
-        p = BASE_P_BUFFER
+        p_to_b_buffer = P_TO_B_BUFFER
 
         if ( self.region == OUTAGE.get("region") and
              OUTAGE["start"]<=tick < OUTAGE["ends"]
              ):
             #p = probability of buffering
-            p = BASE_P_BUFFER * OUTAGE["severity"] #increases the probability of changing state
-        
+            p_to_b_buffer = P_TO_B_BUFFER * OUTAGE["severity"] #increases the probability of changing state
         # change state
-        roll = random.random() 
-        if roll < p:
-            self.state = PlaybackState.BUFFERING 
-        else:
-            self.state = PlaybackState.PLAYING 
-    
+        self.state_transition(p_to_b_buffer)
+            
     def emit(self,tick,base_time):
         """
         return a dict of records e.g 
@@ -88,6 +116,7 @@ def main():
                  for _ in range(N_SESSIONS)]
 
     buffer_counts = {r: 0 for r in REGIONS}
+    stall_counts  = {r: 0 for r in REGIONS}
     total_counts  = {r: 0 for r in REGIONS}
     for tick in range(N_TICKS):
         for s in sessions:
@@ -98,14 +127,14 @@ def main():
 
             if records["state"] == PlaybackState.BUFFERING:
                 buffer_counts[records["region"]] +=1 
+            elif records["state"] == PlaybackState.STALL:
+                stall_counts[records["region"]] +=1 
     
     for r in REGIONS:
         total = total_counts[r] 
-        if total == 0:
-            ratio = 0 
-        else:
-            ratio = buffer_counts[r]/total 
-        print(f"{r}:{ratio:.2f}")
+        buf_ratio = buffer_counts[r]/total if total else 0
+        stall_ratio = stall_counts[r]/total if total else 0
+        print(f"{r}:buffer={buf_ratio:.2f} stall={stall_ratio:.2f}")
             
 if __name__ == "__main__":
     main()
