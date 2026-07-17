@@ -15,7 +15,7 @@ def quick_test():
     )
     
     # Test 1: Create topics with different configurations
-    # print("\n[TEST 1] Creating topics...")
+    print("\n[TEST 1] Creating topics...")
     test_topics = ['test-topic-1', 'test-topic-2', 'test-topic-3']
     
     results = admin.create_topics(
@@ -29,10 +29,24 @@ def quick_test():
     )
     print(f"Creation results: {results}")
 
-    # Test 2: Clean up - Delete test topics
+     # Test 2: List all topics
+    print("\n[TEST 2] Listing topics...")
+    topics = admin.list_topics()
+    print(f"Available topics: {topics[:5]}...")  # Show first 5
+
+       # Test 3: Add partitions
+    print("\n[TEST 3] Adding partitions...")
+    partition_results = admin.add_partitions_to_topic(
+        topic_partitions={'test-topic-1': 5}  # Increase to 5 partitions
+    )
+    print(f"Partition addition results: {partition_results}")
+
+    # Test 4: Clean up - Delete test topics
     print("\n[TEST 5] Cleaning up - Deleting test topics...")
     delete_results = admin.delete_topics(test_topics)
     print(f"Deletion results: {delete_results}")
+
+
 
 quick_test()
     

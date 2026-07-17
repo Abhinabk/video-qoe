@@ -1,7 +1,6 @@
 from confluent_kafka import KafkaException
-from confluent_kafka.admin import AdminClient, NewTopic  # pyright: ignore[reportPrivateImportUsage]
+from confluent_kafka.admin import AdminClient, NewTopic, NewPartitions # pyright: ignore[reportPrivateImportUsage]
 import logging
-
 
 # log config
 logging.basicConfig(
@@ -80,7 +79,38 @@ class KafkaAdmin:
                 logger.error(f"Failed to create topic {topic}: {e}")
                 results[topic] = False
         return results
-    
+
+    def add_partitions_to_topic(
+        self, topic_partitions: dict[str, int]
+    ) -> dict[str, bool]:
+        """
+        increases partions count of existing topics
+        topics_partitions: {"topic_name":int(requires total_count=prev+new partition count)}
+        returns a {topic_name:bool} i.e success or failure to create the topic
+        """
+        new_partitions = [
+            NewPartitions(topic, new_count)
+            for topic, new_count in topic_partitions.items()
+        ]
+
+        futures = self.admin_client.create_partitions(new_partitions)
+        results: dict[str, bool] = {}
+        for topic, future in futures.items():
+            try:
+                future.result()
+                logger.info(f"Partition added successfully for {topic}")
+                results[topic] = True
+            except KafkaException as e:
+                logger.error(f"Failed to create partition to topic {topic}: {e}")
+                results[topic] = False
+        return results
+
+    def list_topics(self) -> list[str]:
+        
+        topic_metadata = self.admin_client.list_topics(timeout=10)
+        topics = list(topic_metadata.topics.keys())
+        logger.info(f"Retrieved topics from cluster: {topics}")
+        return topics
 
     def delete_topics(self, topic_names: list[str]) -> dict[str, bool]:
 
