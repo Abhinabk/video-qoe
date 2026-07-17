@@ -17,9 +17,10 @@ B_TO_P_BUFFER = 0.30  # BUFFERING->PLAYING chance #drain rate
 B_TO_S_BUFFER = 0.05  # BUFFERING -> STALL chance
 S_TO_B_BUFFER = 0.20  # STALL -> BUFFERING chance
 
-OUTAGE_CHANCE = 0.01      # per-tick chance an outage starts
+OUTAGE_CHANCE = 0.01  # per-tick chance an outage starts
 
 N_SESSION = 10
+
 
 class PlaybackState(Enum):
     PLAYING = "playing"
@@ -67,14 +68,16 @@ class Session:
             else:
                 self.state = PlaybackState.STALL
 
-    def advance(self, outage_region,outage_severity):
+    def advance(self, outage_region, outage_severity):
         """
         Decides the session NEXT state for this tick
         read self.state -> roll probability _> write self.state
         """
         p_to_b_buffer = P_TO_B_BUFFER
         if self.region == outage_region:
-           p_to_b_buffer = P_TO_B_BUFFER * outage_severity # increases the probability of buffering for this region
+            p_to_b_buffer = (
+                P_TO_B_BUFFER * outage_severity
+            )  # increases the probability of buffering for this region
         # change state
         self.state_transition(p_to_b_buffer)
 
@@ -91,47 +94,51 @@ class Session:
         return_dict = {
             "session_id": self.session_id,
             "region": self.region,
-            "timestamp": int(time.time() * 1_000),  # time elapsed since 1 Jan 1970 in ms
-            "state": self.state.value, 
-                            
+            "timestamp": int(
+                time.time() * 1_000
+            ),  # time elapsed since 1 Jan 1970 in ms
+            "state": self.state.value,
         }
         return return_dict
 
 
-def main():
- 
-
+def run(callback_sink=print):
+    """
+    Generates fake QoE data and sends it to the sink.
+    If no sink is provided, it defaults to printing.
+    """
     sessions = [
         Session(session_id=str(uuid4()), region=random.choice(REGIONS))
         for _ in range(N_SESSION)
     ]
     tick = 0
-    outage_region = None 
-    outage_ticks_left = 0 
+    outage_region = None
+    outage_ticks_left = 0
     outage_severity = 1
-    try:
-        while True:
-            #if experiencing current outage 
-            if outage_ticks_left > 0:
-                outage_ticks_left-=1
-                if outage_ticks_left == 0:
-                    outage_region = None
+    while True:
+        # if experiencing current outage
+        if outage_ticks_left > 0:
+            outage_ticks_left -= 1
+            if outage_ticks_left == 0:
+                outage_region = None
 
-            #if no outage roll the dice to start one 
-            elif random.random() < OUTAGE_CHANCE:
-                outage_region = random.choice(REGIONS)
-                outage_ticks_left = random.randint(60,120) # duration of outage
-                outage_severity = random.randint(2,5)
- 
-            for s in sessions:
-                s.advance(outage_region,outage_severity)
-                records = s.emit()
-                # producer goes here later
-                print(records)
-            tick += 1
-            time.sleep(TICK_SECONDS)
+        # if no outage roll the dice to start one
+        elif random.random() < OUTAGE_CHANCE:
+            outage_region = random.choice(REGIONS)
+            outage_ticks_left = random.randint(60, 120)  # duration of outage
+            outage_severity = random.randint(2, 5)
+
+        for s in sessions:
+            s.advance(outage_region, outage_severity)
+            records = s.emit()
+            callback_sink(records)
+        tick += 1
+        time.sleep(TICK_SECONDS)
+    
+if __name__ == "__main__":
+    try:
+        run()
     except KeyboardInterrupt:
         print("*" * 6 + "---INTERRUPTED---" + "*" * 6)
 
-if __name__ == "__main__":
-    main()
+
