@@ -93,6 +93,7 @@ class Session:
             "region": self.region,
             "timestamp": int(time.time() * 1_000),  # time elapsed since 1 Jan 1970 in ms
             "state": self.state.value, 
+                            
         }
         return return_dict
 
