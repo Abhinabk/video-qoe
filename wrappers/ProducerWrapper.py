@@ -24,10 +24,10 @@ class KafkaProducer:
         value_serializer=None,
     ):
         if isinstance(bootstrap_servers, list):
-            bs = ",".join(bootstrap_servers)
+            bootstrap_servers = ",".join(bootstrap_servers)
 
         self.config = {
-            "bootstrap.servers": bs,
+            "bootstrap.servers": bootstrap_servers,
             "client.id": client_id,
             "acks": acks,
             "enable.idempotence": enable_idempotence,
@@ -42,49 +42,48 @@ class KafkaProducer:
         self.msg_send = 0
         self.msg_failed = 0
 
-        logger.info(f"Kafka producer initialized with brokers: {bs}")
-    
-    def delivery_report(self,err,msg):
+        logger.info(f"Kafka producer initialized with brokers: {bootstrap_servers}")
+
+    def delivery_report(self, err, msg):
         if err:
             logger.error(f"Delivery failed: {err}")
-            self.msg_failed+=1
+            self.msg_failed += 1
         else:
             logger.info(
-                f"Record successfully delivered to topic={msg.topic()}\n",
-                f"Partition={msg.partition()} offset={msg.offset()}"
+                f"Record successfully delivered to topic={msg.topic()}\n"
+                f"Partition={msg.partition()} offset={msg.offset()}",
             )
-    
-    def produce_msg(self,topic:str,value,key):
-        record_key = key 
-        record_value = value 
+
+    def produce_msg(self, topic: str, value, key):
+        record_key = key
+        record_value = value
 
         try:
-            if self.key_serializer and key:
+            if self.key_serializer and key is not None:
                 record_key = self.key_serializer(
-                key,
-                SerializationContext(topic, MessageField.KEY)
+                    key, SerializationContext(topic, MessageField.KEY)
                 )
-            
-            if self.value_serializer and value:
+
+            if self.value_serializer and value is not None:
                 record_value = self.value_serializer(
-                    value,
-                    SerializationContext(topic,MessageField.VALUE)
+                    value, SerializationContext(topic, MessageField.VALUE)
                 )
             self.producer.produce(
                 topic=topic,
                 key=record_key,
                 value=record_value,
-                callback=self.delivery_report
+                callback=self.delivery_report,
             )
-        except BufferError:
+            self.producer.poll(0)
 
+        except BufferError:
             logger.warning("Local buffer is full, poll briefly and retry.")
             self.producer.poll(0.5)
             self.producer.produce(
                 topic=topic,
                 key=record_key,
                 value=record_value,
-                callback=self.delivery_report
+                callback=self.delivery_report,
             )
         except KafkaException as e:
             logger.error(f"Failed to produce message: {e}")
@@ -96,7 +95,3 @@ class KafkaProducer:
             logger.warning(f"{remaining} message(s) still pending after timeout")
         else:
             logger.info("All of the messages were successfully delivered.")
-        
-        
-
-
