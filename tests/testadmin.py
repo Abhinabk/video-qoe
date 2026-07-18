@@ -1,4 +1,4 @@
-from AdminWrapper import KafkaAdmin
+from kafka.AdminWrapper import KafkaAdmin
 
 def quick_test():
     """

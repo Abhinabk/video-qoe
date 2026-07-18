@@ -1,6 +1,6 @@
-from datagenerator.simulator import run
-from wrappers.AdminWrapper import KafkaAdmin
-from wrappers.ProducerWrapper import KafkaProducer 
+from generator.simulator import run
+from kafka.AdminWrapper import KafkaAdmin
+from kafka.ProducerWrapper import KafkaProducer 
 import logging
 import json
 
