@@ -3,7 +3,8 @@ name = "video-qoe"
 version = "0.1.0"
 description = "A qoe outage detector using kafka"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = [
+    "apache-flink>=2.3.0",
     "confluent-kafka>=2.15.0",
 ]
